@@ -1,0 +1,23 @@
+{
+  "max_context_lines": 40,
+  "rules": {
+    "missing-test-command": {
+      "severity": "error"
+    },
+    "secret-exposure-risk": {
+      "severity": "error"
+    },
+    "excessive-permission": {
+      "severity": "error"
+    },
+    "missing-locale-hint": {
+      "severity": "warning"
+    }
+  },
+  "ignore": [
+    {
+      "rule": "missing-path",
+      "path": "README.md"
+    }
+  ]
+}

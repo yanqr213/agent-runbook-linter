@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-runbook-linter"
+version = "0.1.0"
+description = "Offline CLI linter for AI coding agent runbooks and instructions."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+authors = [
+  {name = "Agent Runbook Linter Maintainers"}
+]
+keywords = ["ai-agents", "codex", "claude", "cursor", "aider", "runbook", "lint", "ci"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = []
+
+[project.optional-dependencies]
+yaml = ["PyYAML>=6.0"]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+agent-runbook-linter = "agent_runbook_linter.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.agent-runbook-linter]
+default_check = "error"
