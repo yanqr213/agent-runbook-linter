@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.0 - 2026-06-08
+
+- Added reviewed baseline JSON output for known runbook findings.
+- Added `--baseline` filtering and `--write-baseline` CLI support.
+- Added stable finding fingerprints to JSON, Markdown, JUnit, and SARIF outputs.
+- Added CI smoke coverage for baseline generation and filtered checks.
+
 ## 0.2.0 - 2026-06-08
 
 - Added SARIF 2.1.0 output for GitHub Code Scanning.

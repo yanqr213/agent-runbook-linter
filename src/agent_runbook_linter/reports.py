@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 from xml.etree import ElementTree
 
+from . import __version__
 from .models import Finding, LintResult
 
 
@@ -37,6 +38,8 @@ def render_json(result: LintResult) -> str:
             "documents": len(result.documents),
             "findings": len(result.findings),
             "counts": result.counts(),
+            "suppressed_findings": len(result.suppressed_findings),
+            "suppressed_counts": result.suppressed_counts(),
         },
         "documents": [doc.relpath for doc in result.documents],
         "findings": [
@@ -47,8 +50,21 @@ def render_json(result: LintResult) -> str:
                 "path": finding.path,
                 "line": finding.line,
                 "details": finding.details,
+                "fingerprint": finding.fingerprint,
             }
             for finding in result.findings
+        ],
+        "suppressed_findings": [
+            {
+                "rule_id": finding.rule_id,
+                "severity": finding.severity,
+                "message": finding.message,
+                "path": finding.path,
+                "line": finding.line,
+                "details": finding.details,
+                "fingerprint": finding.fingerprint,
+            }
+            for finding in result.suppressed_findings
         ],
     }
     return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
@@ -62,6 +78,7 @@ def render_markdown(result: LintResult) -> str:
         f"- Root: `{result.root}`",
         f"- Documents scanned: `{len(result.documents)}`",
         f"- Findings: `{len(result.findings)}`",
+        f"- Suppressed by baseline: `{len(result.suppressed_findings)}`",
         f"- Severity counts: error `{counts.get('error', 0)}`, warning `{counts.get('warning', 0)}`, info `{counts.get('info', 0)}`",
         "",
     ]
@@ -72,12 +89,17 @@ def render_markdown(result: LintResult) -> str:
         lines.append("")
     if not result.findings:
         lines.extend(["## Findings", "", "No findings."])
+        if result.suppressed_findings:
+            lines.extend(_suppressed_markdown(result))
         return "\n".join(lines) + "\n"
     lines.extend(["## Findings", ""])
     for finding in result.findings:
         location = f"{finding.path}:{finding.line}"
         lines.append(f"- **{finding.severity.upper()}** `{finding.rule_id}` at `{location}`")
+        lines.append(f"  - Fingerprint: `{finding.fingerprint}`")
         lines.append(f"  {finding.message}")
+    if result.suppressed_findings:
+        lines.extend(_suppressed_markdown(result))
     return "\n".join(lines) + "\n"
 
 
@@ -89,6 +111,7 @@ def render_junit(result: LintResult) -> str:
             "tests": str(max(1, len(result.findings))),
             "failures": str(len(result.findings)),
             "errors": "0",
+            "skipped": str(len(result.suppressed_findings)),
         },
     )
     if not result.findings:
@@ -111,6 +134,22 @@ def render_junit(result: LintResult) -> str:
             },
         )
         failure.text = f"{finding.path}:{finding.line}: {finding.rule_id}: {finding.message}"
+    for finding in result.suppressed_findings:
+        testcase = ElementTree.SubElement(
+            suite,
+            "testcase",
+            {
+                "name": finding.rule_id,
+                "classname": finding.path,
+            },
+        )
+        ElementTree.SubElement(
+            testcase,
+            "skipped",
+            {
+                "message": f"suppressed by baseline: {finding.fingerprint}",
+            },
+        )
     xml = ElementTree.tostring(suite, encoding="unicode")
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + xml + "\n"
 
@@ -143,16 +182,20 @@ def render_sarif(result: LintResult) -> str:
                 "tool": {
                     "driver": {
                         "name": "agent-runbook-linter",
+                        "semanticVersion": __version__,
                         "informationUri": "https://github.com/yanqr213/agent-runbook-linter",
                         "rules": list(rules.values()),
                     }
                 },
+                "automationDetails": {"id": "agent-runbook-linter"},
                 "results": [_finding_to_sarif(finding) for finding in result.findings],
                 "properties": {
                     "root": str(result.root),
                     "documents": len(result.documents),
                     "findings": len(result.findings),
                     "counts": result.counts(),
+                    "suppressed_findings": len(result.suppressed_findings),
+                    "suppressed_counts": result.suppressed_counts(),
                 },
             }
         ],
@@ -165,6 +208,7 @@ def _finding_to_sarif(finding: Finding) -> Dict[str, Any]:
         "ruleId": finding.rule_id,
         "level": _sarif_level(finding.severity),
         "message": {"text": finding.message},
+        "partialFingerprints": {"agentRunbookLinter/v1": finding.fingerprint},
         "locations": [
             {
                 "physicalLocation": {
@@ -179,6 +223,19 @@ def _finding_to_sarif(finding: Finding) -> Dict[str, Any]:
             "details": finding.details,
         },
     }
+
+
+def _suppressed_markdown(result: LintResult) -> List[str]:
+    lines = [
+        "",
+        "## Suppressed By Baseline",
+        "",
+    ]
+    for finding in result.suppressed_findings:
+        location = f"{finding.path}:{finding.line}"
+        lines.append(f"- **{finding.severity.upper()}** `{finding.rule_id}` at `{location}`")
+        lines.append(f"  - Fingerprint: `{finding.fingerprint}`")
+    return lines
 
 
 def _sarif_level(severity: str) -> str:

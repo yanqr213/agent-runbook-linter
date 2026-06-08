@@ -22,6 +22,7 @@ class Finding:
     path: str
     line: int = 1
     details: Dict[str, Any] = field(default_factory=dict)
+    fingerprint: str = ""
 
     def level(self) -> int:
         return SEVERITY_ORDER.get(self.severity, 0)
@@ -55,10 +56,17 @@ class LintResult:
     root: Path
     documents: List[Document]
     findings: List[Finding]
+    suppressed_findings: List[Finding] = field(default_factory=list)
 
     def counts(self) -> Dict[str, int]:
         counts = {"info": 0, "warning": 0, "error": 0}
         for finding in self.findings:
+            counts[finding.severity] = counts.get(finding.severity, 0) + 1
+        return counts
+
+    def suppressed_counts(self) -> Dict[str, int]:
+        counts = {"info": 0, "warning": 0, "error": 0}
+        for finding in self.suppressed_findings:
             counts[finding.severity] = counts.get(finding.severity, 0) + 1
         return counts
 

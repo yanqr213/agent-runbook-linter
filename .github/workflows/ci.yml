@@ -21,3 +21,8 @@ jobs:
       - run: python -m unittest discover -s tests
       - run: agent-runbook-linter examples/healthy-repo --check warning
       - run: agent-runbook-linter examples/problem-repo --format sarif --output reports/agent-runbook.sarif
+      - run: python -m json.tool reports/agent-runbook.sarif > /dev/null
+      - run: agent-runbook-linter examples/problem-repo --write-baseline reports/agent-runbook-baseline.json
+      - run: python -m json.tool reports/agent-runbook-baseline.json > /dev/null
+      - run: agent-runbook-linter examples/problem-repo --baseline reports/agent-runbook-baseline.json --check warning --format json --output reports/agent-runbook-filtered.json
+      - run: python -m json.tool reports/agent-runbook-filtered.json > /dev/null

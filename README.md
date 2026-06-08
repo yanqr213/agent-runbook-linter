@@ -14,6 +14,7 @@
 - 支持 JSON 配置，YAML 配置可选；未安装 PyYAML 时支持简单顶层 YAML fallback。
 - 支持忽略项、规则 severity、`--check warning|error`、`--output` 自动创建父目录。
 - 输出 `markdown`、`json`、`junit`、`sarif`，可直接接入 CI 和 GitHub Code Scanning。
+- 支持 baseline：把已复核的历史 runbook finding 记录下来，让 CI 只拦截新增问题。
 
 ## 安装
 
@@ -69,6 +70,13 @@ agent-runbook-linter . --config agent-runbook-linter.json --format junit --outpu
 agent-runbook-linter . --format sarif --output reports/agent-runbook.sarif
 ```
 
+生成并使用 baseline：
+
+```bash
+agent-runbook-linter . --write-baseline reports/agent-runbook-baseline.json
+agent-runbook-linter . --baseline reports/agent-runbook-baseline.json --check warning
+```
+
 也可以用模块方式运行：
 
 ```bash
@@ -120,6 +128,8 @@ JSON 示例：
 ```
 
 JUnit 输出适合 CI 系统展示为测试失败，每个 finding 会成为一个 failing testcase。SARIF 输出遵循 2.1.0 结构，可上传到 GitHub Code Scanning，把 runbook 问题显示在 PR 的扫描视图里。
+
+使用 baseline 后，JSON、Markdown、JUnit 和 SARIF 仍会保留 suppressed 统计或跳过项，方便团队后续逐步清理历史 runbook 债务。
 
 ## 规则配置
 
@@ -175,6 +185,24 @@ JSON 配置示例：
 
 忽略项支持按 `rule`、`path` glob、`line` 匹配。`rule` 可为字符串、数组或 `*`。
 
+## Baseline 工作流
+
+baseline 是一个可审阅、可提交的 JSON 文件，包含每条 finding 的 `rule_id`、`path`、`line`、`message`、`details` 和稳定 `fingerprint`。它适合已有仓库首次接入 linter：先承认历史问题，再要求后续 PR 不新增不可执行或高风险指令。
+
+```bash
+agent-runbook-linter . --write-baseline reports/agent-runbook-baseline.json
+agent-runbook-linter . --baseline reports/agent-runbook-baseline.json --check warning --format json --output reports/agent-runbook.json
+```
+
+建议流程：
+
+1. 首次接入时生成 `agent-runbook-baseline.json`。
+2. 人工审阅 baseline 中的规则、路径、消息和 fingerprint。
+3. 把 baseline 文件提交到仓库或放入受控安全例外目录。
+4. CI 中使用 `--baseline`，只让新增 warning/error 阻断合并。
+
+不要在同一个阻断型 CI run 里先生成 baseline 再扫描当前改动，否则当前问题会被直接放过。baseline 应该由维护者在风险复核后更新。
+
 ## 检测规则
 
 | Rule ID | 说明 |
@@ -213,7 +241,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install agent-runbook-linter
-      - run: agent-runbook-linter . --check warning --format junit --output reports/agent-runbook-junit.xml
+      - run: agent-runbook-linter . --baseline reports/agent-runbook-baseline.json --check warning --format junit --output reports/agent-runbook-junit.xml
 ```
 
 上传 SARIF 到 GitHub Code Scanning：
@@ -245,6 +273,7 @@ agent-runbook-linter . --check error --format markdown --output reports/agent-ru
 - “冲突”和“过期命令”判断无法覆盖所有技术栈，需要团队用配置和 ignore 调整。
 - YAML fallback 只支持简单顶层标量和列表；复杂嵌套 YAML 请安装 `PyYAML` 或使用 JSON。
 - README 只在包含 agent、runbook、Codex、Claude Code、Cursor、Aider 等相关标记时扫描。
+- baseline 是审计文件，不是永久忽略规则；请像维护安全例外或测试快照一样审阅和定期清理。
 
 ## English Overview
 
@@ -257,6 +286,10 @@ Basic usage:
 ```bash
 agent-runbook-linter . --check warning --format json --output reports/agent-runbook.json
 agent-runbook-linter . --format sarif --output reports/agent-runbook.sarif
+agent-runbook-linter . --write-baseline reports/agent-runbook-baseline.json
+agent-runbook-linter . --baseline reports/agent-runbook-baseline.json --check warning
 ```
+
+Reviewed baseline JSON files let teams suppress known historical runbook findings while still failing CI on new warning/error findings. Reports keep suppressed-finding metadata so accepted risk remains auditable and can be cleaned up over time.
 
 The tool is intentionally conservative and dependency-light. It does not execute commands or send repository content to external services.
