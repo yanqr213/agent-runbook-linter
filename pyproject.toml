@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-runbook-linter"
-version = "0.1.0"
+version = "0.2.0"
 description = "Offline CLI linter for AI coding agent runbooks and instructions."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -27,6 +27,10 @@ classifiers = [
   "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/yanqr213/agent-runbook-linter"
+Issues = "https://github.com/yanqr213/agent-runbook-linter/issues"
 
 [project.optional-dependencies]
 yaml = ["PyYAML>=6.0"]

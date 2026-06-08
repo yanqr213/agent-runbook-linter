@@ -1,6 +1,6 @@
 # agent-runbook-linter
 
-`agent-runbook-linter` 是一个离线 CLI，用来扫描仓库中的 AI 编程代理指令文件，例如 `AGENTS.md`、`CLAUDE.md`、`CODEX.md`、`CODEX/CODEX.md`、`.cursor/rules` 以及包含 agent/runbook 指令的 `README`。它会发现冲突、缺失、不可执行或风险过高的指令，并输出 Markdown、JSON 或 JUnit 报告，适合作为 CI gate。
+`agent-runbook-linter` 是一个离线 CLI，用来扫描仓库中的 AI 编程代理指令文件，例如 `AGENTS.md`、`CLAUDE.md`、`CODEX.md`、`CODEX/CODEX.md`、`.cursor/rules` 以及包含 agent/runbook 指令的 `README`。它会发现冲突、缺失、不可执行或风险过高的指令，并输出 Markdown、JSON、JUnit 或 SARIF 报告，适合作为 CI gate。
 
 它面向正在使用 Codex、Claude Code、Cursor、Aider 等 AI coding agents 的开发者和团队。目标不是替代人工 review，而是在代理执行前尽早暴露会让任务跑偏、越权或无法验收的 runbook 问题。
 
@@ -13,7 +13,7 @@
 - 检测不存在的本地路径、过长上下文、过期命令、语言/地区化提示缺失。
 - 支持 JSON 配置，YAML 配置可选；未安装 PyYAML 时支持简单顶层 YAML fallback。
 - 支持忽略项、规则 severity、`--check warning|error`、`--output` 自动创建父目录。
-- 输出 `markdown`、`json`、`junit`，可直接接入 CI。
+- 输出 `markdown`、`json`、`junit`、`sarif`，可直接接入 CI 和 GitHub Code Scanning。
 
 ## 安装
 
@@ -61,6 +61,12 @@ agent-runbook-linter . --check error
 
 ```bash
 agent-runbook-linter . --config agent-runbook-linter.json --format junit --output reports/junit.xml
+```
+
+输出 SARIF：
+
+```bash
+agent-runbook-linter . --format sarif --output reports/agent-runbook.sarif
 ```
 
 也可以用模块方式运行：
@@ -113,7 +119,7 @@ JSON 示例：
 }
 ```
 
-JUnit 输出适合 CI 系统展示为测试失败，每个 finding 会成为一个 failing testcase。
+JUnit 输出适合 CI 系统展示为测试失败，每个 finding 会成为一个 failing testcase。SARIF 输出遵循 2.1.0 结构，可上传到 GitHub Code Scanning，把 runbook 问题显示在 PR 的扫描视图里。
 
 ## 规则配置
 
@@ -210,6 +216,15 @@ jobs:
       - run: agent-runbook-linter . --check warning --format junit --output reports/agent-runbook-junit.xml
 ```
 
+上传 SARIF 到 GitHub Code Scanning：
+
+```yaml
+- run: agent-runbook-linter . --format sarif --output reports/agent-runbook.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: reports/agent-runbook.sarif
+```
+
 如果从源码仓库运行：
 
 ```bash
@@ -235,12 +250,13 @@ agent-runbook-linter . --check error --format markdown --output reports/agent-ru
 
 `agent-runbook-linter` is an offline CLI for linting AI coding agent instructions in files such as `AGENTS.md`, `CLAUDE.md`, `CODEX.md`, `CODEX/CODEX.md`, `.cursor/rules`, and agent-related README content. It detects contradictory commands, missing test and validation steps, unsafe permission grants, secret exposure risks, missing paths, long context, vague delivery instructions, and missing language or locale guidance.
 
-It is designed for developers using Codex, Claude Code, Cursor, Aider, and similar tools. Reports are available as Markdown, JSON, or JUnit, making the linter suitable for CI gates.
+It is designed for developers using Codex, Claude Code, Cursor, Aider, and similar tools. Reports are available as Markdown, JSON, JUnit, or SARIF, making the linter suitable for CI gates and GitHub Code Scanning.
 
 Basic usage:
 
 ```bash
 agent-runbook-linter . --check warning --format json --output reports/agent-runbook.json
+agent-runbook-linter . --format sarif --output reports/agent-runbook.sarif
 ```
 
 The tool is intentionally conservative and dependency-light. It does not execute commands or send repository content to external services.

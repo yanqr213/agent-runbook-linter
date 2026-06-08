@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.2.0 - 2026-06-08
+
+- Added SARIF 2.1.0 output for GitHub Code Scanning.
+- Added SARIF report and CLI output tests.
+- Added SARIF CI smoke coverage.
+- Added public GitHub project URLs.
+
 ## 0.1.0 - 2026-06-08
 
 - Initial release of the offline `agent-runbook-linter` CLI.

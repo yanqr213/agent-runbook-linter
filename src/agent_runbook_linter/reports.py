@@ -2,7 +2,7 @@ import html
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 from xml.etree import ElementTree
 
 from .models import Finding, LintResult
@@ -13,6 +13,8 @@ def render_report(result: LintResult, fmt: str) -> str:
         return render_json(result)
     if fmt == "junit":
         return render_junit(result)
+    if fmt == "sarif":
+        return render_sarif(result)
     if fmt == "markdown":
         return render_markdown(result)
     raise ValueError(f"Unsupported format: {fmt}")
@@ -111,3 +113,77 @@ def render_junit(result: LintResult) -> str:
         failure.text = f"{finding.path}:{finding.line}: {finding.rule_id}: {finding.message}"
     xml = ElementTree.tostring(suite, encoding="unicode")
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + xml + "\n"
+
+
+def render_sarif(result: LintResult) -> str:
+    rules: Dict[str, Dict[str, Any]] = {}
+    for finding in result.findings:
+        rules.setdefault(
+            finding.rule_id,
+            {
+                "id": finding.rule_id,
+                "name": finding.rule_id,
+                "shortDescription": {"text": finding.rule_id},
+                "fullDescription": {"text": f"Agent runbook lint rule: {finding.rule_id}."},
+                "help": {
+                    "text": "Review AI coding agent instructions before merging; clarify commands, permissions, paths, acceptance criteria, and safety constraints."
+                },
+                "defaultConfiguration": {"level": _sarif_level(finding.severity)},
+                "properties": {
+                    "severity": finding.severity,
+                    "tool": "agent-runbook-linter",
+                },
+            },
+        )
+    payload = {
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "agent-runbook-linter",
+                        "informationUri": "https://github.com/yanqr213/agent-runbook-linter",
+                        "rules": list(rules.values()),
+                    }
+                },
+                "results": [_finding_to_sarif(finding) for finding in result.findings],
+                "properties": {
+                    "root": str(result.root),
+                    "documents": len(result.documents),
+                    "findings": len(result.findings),
+                    "counts": result.counts(),
+                },
+            }
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+
+
+def _finding_to_sarif(finding: Finding) -> Dict[str, Any]:
+    return {
+        "ruleId": finding.rule_id,
+        "level": _sarif_level(finding.severity),
+        "message": {"text": finding.message},
+        "locations": [
+            {
+                "physicalLocation": {
+                    "artifactLocation": {"uri": finding.path.replace("\\", "/")},
+                    "region": {"startLine": max(int(finding.line or 1), 1)},
+                }
+            }
+        ],
+        "properties": {
+            "severity": finding.severity,
+            "rule_id": finding.rule_id,
+            "details": finding.details,
+        },
+    }
+
+
+def _sarif_level(severity: str) -> str:
+    if severity == "error":
+        return "error"
+    if severity == "warning":
+        return "warning"
+    return "note"

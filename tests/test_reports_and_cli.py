@@ -8,7 +8,7 @@ from xml.etree import ElementTree
 
 import helpers  # noqa: F401
 from agent_runbook_linter.linter import run_lint
-from agent_runbook_linter.reports import render_junit, render_json, render_markdown
+from agent_runbook_linter.reports import render_junit, render_json, render_markdown, render_sarif
 
 
 class ReportsAndCliTests(unittest.TestCase):
@@ -36,6 +36,20 @@ class ReportsAndCliTests(unittest.TestCase):
         xml = render_junit(result)
         root = ElementTree.fromstring(xml)
         self.assertEqual("testsuite", root.tag)
+
+    def test_sarif_report_contains_rule_and_location(self):
+        result = run_lint(self.make_repo("Language: English.\nAcceptance: done.\n"))
+        payload = json.loads(render_sarif(result))
+        run = payload["runs"][0]
+        sarif_result = run["results"][0]
+
+        self.assertEqual("2.1.0", payload["version"])
+        self.assertEqual("agent-runbook-linter", run["tool"]["driver"]["name"])
+        self.assertEqual("missing-test-command", sarif_result["ruleId"])
+        self.assertEqual("error", sarif_result["level"])
+        location = sarif_result["locations"][0]["physicalLocation"]
+        self.assertEqual("AGENTS.md", location["artifactLocation"]["uri"])
+        self.assertEqual(1, location["region"]["startLine"])
 
     def test_cli_check_warning_exits_one(self):
         repo = self.make_repo("Language: English.\nAcceptance: done.\n")
@@ -72,6 +86,30 @@ class ReportsAndCliTests(unittest.TestCase):
         self.assertEqual("", proc.stdout)
         self.assertTrue(output.exists())
         self.assertIn("findings", json.loads(output.read_text(encoding="utf-8")))
+
+    def test_cli_sarif_output_creates_parent_directory(self):
+        repo = self.make_repo("Language: English.\nAcceptance: done.\n")
+        output = repo / "nested" / "reports" / "runbook.sarif"
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "agent_runbook_linter",
+                str(repo),
+                "--format",
+                "sarif",
+                "--output",
+                str(output),
+            ],
+            cwd=str(helpers.ROOT),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.assertEqual(0, proc.returncode)
+        self.assertEqual("", proc.stdout)
+        self.assertTrue(output.exists())
+        self.assertEqual("2.1.0", json.loads(output.read_text(encoding="utf-8"))["version"])
 
     def test_cli_check_error_respects_severity(self):
         repo = self.make_repo("Language: English.\nAcceptance: done.\n")

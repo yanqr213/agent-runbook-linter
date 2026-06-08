@@ -17,7 +17,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", help="JSON or YAML config file.")
     parser.add_argument(
         "--format",
-        choices=["markdown", "json", "junit"],
+        choices=["markdown", "json", "junit", "sarif"],
         default="markdown",
         help="Report format.",
     )
