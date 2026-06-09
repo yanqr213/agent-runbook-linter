@@ -9,7 +9,7 @@ from xml.etree import ElementTree
 import helpers  # noqa: F401
 from agent_runbook_linter.baseline import apply_baseline, render_baseline
 from agent_runbook_linter.linter import run_lint
-from agent_runbook_linter.reports import render_junit, render_json, render_markdown, render_sarif
+from agent_runbook_linter.reports import render_fix_plan, render_junit, render_json, render_markdown, render_sarif
 
 
 class ReportsAndCliTests(unittest.TestCase):
@@ -49,13 +49,29 @@ class ReportsAndCliTests(unittest.TestCase):
 
         self.assertEqual("2.1.0", payload["version"])
         self.assertEqual("agent-runbook-linter", run["tool"]["driver"]["name"])
-        self.assertEqual("0.3.0", run["tool"]["driver"]["semanticVersion"])
+        self.assertEqual("0.4.0", run["tool"]["driver"]["semanticVersion"])
         self.assertEqual("missing-test-command", sarif_result["ruleId"])
         self.assertEqual("error", sarif_result["level"])
         self.assertIn("agentRunbookLinter/v1", sarif_result["partialFingerprints"])
         location = sarif_result["locations"][0]["physicalLocation"]
         self.assertEqual("AGENTS.md", location["artifactLocation"]["uri"])
         self.assertEqual(1, location["region"]["startLine"])
+
+    def test_fix_plan_contains_guidance_and_agent_prompt(self):
+        result = run_lint(self.make_repo("Language: English.\nAcceptance: done.\n"))
+        plan = render_fix_plan(result)
+
+        self.assertIn("# Agent Runbook Fix Plan", plan)
+        self.assertIn("## Recommended Order", plan)
+        self.assertIn("missing-test-command", plan)
+        self.assertIn("Suggested runbook text", plan)
+        self.assertIn("## Agent Repair Prompt", plan)
+
+    def test_fix_plan_clear_result_mentions_no_active_fixes(self):
+        result = run_lint(self.make_repo("Run tests with `pytest`.\nLanguage: English.\nAcceptance: done.\n"))
+        plan = render_fix_plan(result)
+
+        self.assertIn("No active runbook fixes are required", plan)
 
     def test_cli_check_warning_exits_one(self):
         repo = self.make_repo("Language: English.\nAcceptance: done.\n")
@@ -172,6 +188,30 @@ class ReportsAndCliTests(unittest.TestCase):
         self.assertEqual("", proc.stdout)
         self.assertTrue(output.exists())
         self.assertEqual("2.1.0", json.loads(output.read_text(encoding="utf-8"))["version"])
+
+    def test_cli_fix_plan_output_creates_parent_directory(self):
+        repo = self.make_repo("Language: English.\nAcceptance: done.\n")
+        output = repo / "nested" / "reports" / "runbook-fix-plan.md"
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "agent_runbook_linter",
+                str(repo),
+                "--format",
+                "fix-plan",
+                "--output",
+                str(output),
+            ],
+            cwd=str(helpers.ROOT),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.assertEqual(0, proc.returncode)
+        self.assertEqual("", proc.stdout)
+        self.assertTrue(output.exists())
+        self.assertIn("Agent Runbook Fix Plan", output.read_text(encoding="utf-8"))
 
     def test_cli_check_error_respects_severity(self):
         repo = self.make_repo("Language: English.\nAcceptance: done.\n")

@@ -1,6 +1,6 @@
 # agent-runbook-linter
 
-`agent-runbook-linter` 是一个离线 CLI，用来扫描仓库中的 AI 编程代理指令文件，例如 `AGENTS.md`、`CLAUDE.md`、`CODEX.md`、`CODEX/CODEX.md`、`.cursor/rules` 以及包含 agent/runbook 指令的 `README`。它会发现冲突、缺失、不可执行或风险过高的指令，并输出 Markdown、JSON、JUnit 或 SARIF 报告，适合作为 CI gate。
+`agent-runbook-linter` 是一个离线 CLI，用来扫描仓库中的 AI 编程代理指令文件，例如 `AGENTS.md`、`CLAUDE.md`、`CODEX.md`、`CODEX/CODEX.md`、`.cursor/rules` 以及包含 agent/runbook 指令的 `README`。它会发现冲突、缺失、不可执行或风险过高的指令，并输出 Markdown、JSON、JUnit、SARIF 或可直接交给维护者/agent 的修复计划，适合作为 CI gate。
 
 它面向正在使用 Codex、Claude Code、Cursor、Aider 等 AI coding agents 的开发者和团队。目标不是替代人工 review，而是在代理执行前尽早暴露会让任务跑偏、越权或无法验收的 runbook 问题。
 
@@ -13,7 +13,7 @@
 - 检测不存在的本地路径、过长上下文、过期命令、语言/地区化提示缺失。
 - 支持 JSON 配置，YAML 配置可选；未安装 PyYAML 时支持简单顶层 YAML fallback。
 - 支持忽略项、规则 severity、`--check warning|error`、`--output` 自动创建父目录。
-- 输出 `markdown`、`json`、`junit`、`sarif`，可直接接入 CI 和 GitHub Code Scanning。
+- 输出 `markdown`、`json`、`junit`、`sarif`、`fix-plan`，可直接接入 CI、GitHub Code Scanning 和 agent 修复工作流。
 - 支持 baseline：把已复核的历史 runbook finding 记录下来，让 CI 只拦截新增问题。
 
 ## 安装
@@ -68,6 +68,12 @@ agent-runbook-linter . --config agent-runbook-linter.json --format junit --outpu
 
 ```bash
 agent-runbook-linter . --format sarif --output reports/agent-runbook.sarif
+```
+
+生成修复计划，方便贴到 PR、issue 或交给 Codex/Claude Code：
+
+```bash
+agent-runbook-linter . --format fix-plan --output reports/agent-runbook-fix-plan.md
 ```
 
 生成并使用 baseline：
@@ -127,7 +133,7 @@ JSON 示例：
 }
 ```
 
-JUnit 输出适合 CI 系统展示为测试失败，每个 finding 会成为一个 failing testcase。SARIF 输出遵循 2.1.0 结构，可上传到 GitHub Code Scanning，把 runbook 问题显示在 PR 的扫描视图里。
+JUnit 输出适合 CI 系统展示为测试失败，每个 finding 会成为一个 failing testcase。SARIF 输出遵循 2.1.0 结构，可上传到 GitHub Code Scanning，把 runbook 问题显示在 PR 的扫描视图里。`fix-plan` 输出会按文件分组列出修复项、规则解释、推荐 runbook 文本片段和一个可复制给 agent 的修复 prompt，适合把 lint 结果直接转成维护任务。
 
 使用 baseline 后，JSON、Markdown、JUnit 和 SARIF 仍会保留 suppressed 统计或跳过项，方便团队后续逐步清理历史 runbook 债务。
 
@@ -279,16 +285,19 @@ agent-runbook-linter . --check error --format markdown --output reports/agent-ru
 
 `agent-runbook-linter` is an offline CLI for linting AI coding agent instructions in files such as `AGENTS.md`, `CLAUDE.md`, `CODEX.md`, `CODEX/CODEX.md`, `.cursor/rules`, and agent-related README content. It detects contradictory commands, missing test and validation steps, unsafe permission grants, secret exposure risks, missing paths, long context, vague delivery instructions, and missing language or locale guidance.
 
-It is designed for developers using Codex, Claude Code, Cursor, Aider, and similar tools. Reports are available as Markdown, JSON, JUnit, or SARIF, making the linter suitable for CI gates and GitHub Code Scanning.
+It is designed for developers using Codex, Claude Code, Cursor, Aider, and similar tools. Reports are available as Markdown, JSON, JUnit, SARIF, or `fix-plan`, making the linter suitable for CI gates, GitHub Code Scanning, and agent repair workflows.
 
 Basic usage:
 
 ```bash
 agent-runbook-linter . --check warning --format json --output reports/agent-runbook.json
 agent-runbook-linter . --format sarif --output reports/agent-runbook.sarif
+agent-runbook-linter . --format fix-plan --output reports/agent-runbook-fix-plan.md
 agent-runbook-linter . --write-baseline reports/agent-runbook-baseline.json
 agent-runbook-linter . --baseline reports/agent-runbook-baseline.json --check warning
 ```
+
+The `fix-plan` report groups findings by file, explains how to remediate each rule, includes suggested runbook snippets for common problems, and ends with a copy-ready agent repair prompt.
 
 Reviewed baseline JSON files let teams suppress known historical runbook findings while still failing CI on new warning/error findings. Reports keep suppressed-finding metadata so accepted risk remains auditable and can be cleaned up over time.
 

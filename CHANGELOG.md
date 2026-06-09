@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.4.0 - 2026-06-09
+
+- Added `--format fix-plan` to turn runbook findings into issue/PR-ready remediation plans.
+- Added per-file work items, rule-specific guidance, suggested runbook snippets, and copy-ready agent repair prompts.
+- Added CI smoke coverage and tests for fix-plan reports and CLI output.
+- Expanded Chinese and English README usage notes for fix-plan workflows.
+
 ## 0.3.0 - 2026-06-08
 
 - Added reviewed baseline JSON output for known runbook findings.
